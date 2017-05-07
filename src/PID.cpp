@@ -1,3 +1,4 @@
+#include <iostream>
 #include "PID.h"
 
 using namespace std;
@@ -11,11 +12,30 @@ PID::PID() {}
 PID::~PID() {}
 
 void PID::Init(double Kp, double Ki, double Kd) {
+    PID::Kp = Kp;
+    PID::Ki = Ki;
+    PID::Kd = Kd;
+
+    PID::prev_cte = 0;
+    PID::int_cte = 0;
+    PID::n = 0;
+    PID::err = 0;
 }
 
-void PID::UpdateError(double cte) {
+double PID::UpdateError(double cte) {
+    n++;
+    double diff_cte = cte - prev_cte;
+    prev_cte = cte;
+    int_cte += cte;
+    err += cte * cte;
+    double steer = -Kp * cte - Kd * diff_cte - Ki * int_cte;
+
+    //std::cout << "CTE: " << cte << " diff_cte: " << diff_cte << " int_cte: " << int_cte << std::endl;
+
+    return steer;
 }
 
 double PID::TotalError() {
+    return err / n;
 }
 

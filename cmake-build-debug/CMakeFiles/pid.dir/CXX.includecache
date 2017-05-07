@@ -1,0 +1,86 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/kvasnyj/Dropbox/4. PID/CarND-PID-Control-Project/src/PID.cpp
+iostream
+-
+PID.h
+/home/kvasnyj/Dropbox/4. PID/CarND-PID-Control-Project/src/PID.h
+
+/home/kvasnyj/Dropbox/4. PID/CarND-PID-Control-Project/src/PID.h
+
+/home/kvasnyj/Dropbox/4. PID/CarND-PID-Control-Project/src/json.hpp
+algorithm
+-
+array
+-
+cassert
+-
+cctype
+-
+ciso646
+-
+cmath
+-
+cstddef
+-
+cstdint
+-
+cstdlib
+-
+cstring
+-
+forward_list
+-
+functional
+-
+initializer_list
+-
+iomanip
+-
+iostream
+-
+iterator
+-
+limits
+-
+locale
+-
+map
+-
+memory
+-
+numeric
+-
+sstream
+-
+stdexcept
+-
+string
+-
+type_traits
+-
+utility
+-
+vector
+-
+
+/home/kvasnyj/Dropbox/4. PID/CarND-PID-Control-Project/src/main.cpp
+uWS/uWS.h
+-
+iostream
+-
+json.hpp
+/home/kvasnyj/Dropbox/4. PID/CarND-PID-Control-Project/src/json.hpp
+PID.h
+/home/kvasnyj/Dropbox/4. PID/CarND-PID-Control-Project/src/PID.h
+math.h
+-
+err.h
+-
+
