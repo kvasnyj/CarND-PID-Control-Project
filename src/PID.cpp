@@ -28,8 +28,11 @@ double PID::UpdateError(double cte) {
     double diff_cte = cte - prev_cte;
     prev_cte = cte;
     int_cte += cte;
-    err += fabs(cte);
+    err += (1 + fabs(cte)) * (1 + fabs(cte));
+
     double steer = -Kp * cte - Kd * diff_cte - Ki * int_cte;
+    if (steer > 0.6) steer = 0.6;
+    if (steer < -0.6) steer = -0.6;
 
     //std::cout << "CTE: " << cte << " diff_cte: " << diff_cte << " int_cte: " << int_cte << std::endl;
 

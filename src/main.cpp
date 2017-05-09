@@ -3,17 +3,9 @@
 #include "json.hpp"
 #include "PID.h"
 #include <math.h>
-#include <err.h>
 
 // for convenience
 using json = nlohmann::json;
-
-// For converting back and forth between radians and degrees.
-constexpr double pi() { return M_PI; }
-
-double deg2rad(double x) { return x * pi() / 180; }
-
-double rad2deg(double x) { return x * 180 / pi(); }
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -50,7 +42,11 @@ void move(uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode
 
             json msgJson;
             msgJson["steering_angle"] = steer_value;
-            msgJson["throttle"] = 0.3;
+            msgJson["throttle"] = 1;
+
+            if ((fabs(cte) >= 0.4 | fabs(angle) > 5 | steer_value >= 0.5) && speed >= 28.0)
+                msgJson["throttle"] = -1; // brake
+
             auto msg = "42[\"steer\"," + msgJson.dump() + "]";
             if (print) std::cout << msg << std::endl;
             ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
@@ -62,34 +58,38 @@ void move(uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode
     }
 }
 
-void run(double p[], bool optimize) {
+void run(double p[], bool useTwiddle) {
     PID pid;
     pid.Init(p[0], p[1], p[2]);
 
     uWS::Hub h;
     int i = 0, it = 0, par = 0;
-    double dp[] = {.1, .1, .1};
+    double dp[] = {1, 1, 1};
     int state = 0;
     double best_err = 0;
 
     h.onMessage(
-            [&pid, &i, &dp, &state, &best_err, &it, &par, &optimize, &p](uWS::WebSocket<uWS::SERVER> ws, char *data,
-                                                                         size_t length, uWS::OpCode opCode) {
+            [&pid, &i, &dp, &state, &best_err, &it, &par, &useTwiddle, &p](uWS::WebSocket<uWS::SERVER> ws, char *data,
+                                                                           size_t length, uWS::OpCode opCode) {
                 // "42" at the start of the message means there's a websocket message event.
                 // The 4 signifies a websocket message
                 // The 2 signifies a websocket event
                 if (length && length > 2 && data[0] == '4' && data[1] == '2') {
                     double tolerance = 0.2;
-                    int n = 500;
+                    int n = 500; //max steps per iteration
+
+                    double err = pid.TotalError();
+
+                    // if current error bigger than best_error -> stop
+                    if (i > 100 && err > best_err && state > 0) i = n + 1;
 
                     //twiddle
-                    if (i >= n && optimize) {
+                    if (i >= n && useTwiddle) {
                         i = 0;
 
-                        double err = pid.TotalError();
                         double sum_dp = std::accumulate(std::begin(dp), std::end(dp), 0.0, std::plus<double>());
 
-                        if (state < 2 & par == 0) {
+                        if (state < 2 & par == 0) { //new iteration
                             std::cout << "iteration: " << it++ << ", error: " << err << ", best_err: " << best_err
                                       << ", sum_dp: " << sum_dp << std::endl;
                             std::cout << "Kp = " << p[0] << ", Ki = " << p[1] << ", Kd = " << p[2] << std::endl;
@@ -98,8 +98,8 @@ void run(double p[], bool optimize) {
 
                         if (sum_dp > tolerance) {
                             //std::cout << "state = " << state << ", par = " << par << std::endl;
-                            switch (state) {
-                                case 0: // init
+                            switch (state) { //state machine
+                                case 0: // init, one time
                                     best_err = err;
                                     state = 1;
                                     p[par] += dp[par];
@@ -110,7 +110,7 @@ void run(double p[], bool optimize) {
                                         dp[par] *= 1.1;
 
                                         par = (par + 1) % 3;
-                                        if(par==1) par++; // Ki is constant
+                                        if (par == 1) par++; // Ki is constantly 0
 
                                         p[par] += dp[par];
                                     } else {
@@ -127,7 +127,7 @@ void run(double p[], bool optimize) {
                                         dp[par] *= 0.9;
                                     }
                                     par = (par + 1) % 3;
-                                    if(par==1) par++; // Ki is constant
+                                    if (par == 1) par++; // Ki is constantly 0
 
                                     state = 1;
                                     p[par] += dp[par];
@@ -135,8 +135,9 @@ void run(double p[], bool optimize) {
                             }
 
                             pid.Init(p[0], p[1], p[2]);
-                        } else {   // finish!!!
-                            optimize = false;
+                        } else {
+                            // finish!!!
+                            useTwiddle = false;
                         }
                     }
 
@@ -145,7 +146,7 @@ void run(double p[], bool optimize) {
                         ws.send(reset_msg.data(), reset_msg.length(), uWS::OpCode::TEXT);
                     }
 
-                    move(ws, data, length, opCode, false, pid);
+                    move(ws, data, length, opCode, !useTwiddle, pid);
                 }
             });
 
@@ -182,11 +183,9 @@ void run(double p[], bool optimize) {
 
 
 int main() {
-    //double p[] = {0, 0, 0};
-    double p[] = {0.750722, 0.000, 4.18653};
-    //double p[] = {0.2, 0.000, 3};
-    
-    run(p, true); // (parameters, use twiddle)
+    double p[] = {0.3, 0.000, 3.5}; // yes, I don't use Ki
+
+    run(p, false); // (parameters, use twiddle)
 
     return 0;
 }
