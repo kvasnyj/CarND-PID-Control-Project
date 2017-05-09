@@ -30,8 +30,7 @@ std::string hasData(std::string s) {
     return "";
 }
 
-void move(uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode, bool print, PID &pid)
-{
+void move(uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode, bool print, PID &pid) {
     auto s = hasData(std::string(data).substr(0, length));
     if (s != "") {
         auto j = json::parse(s);
@@ -68,48 +67,54 @@ void run(double p[], bool optimize) {
     pid.Init(p[0], p[1], p[2]);
 
     uWS::Hub h;
-    int i = 0, it=0, par=0;
-    double dp[] = {.1, .01, 1.};
+    int i = 0, it = 0, par = 0;
+    double dp[] = {.1, .1, .1};
     int state = 0;
     double best_err = 0;
 
     h.onMessage(
-            [&pid, &i, &dp, &state, &best_err, &it, &par, &optimize, &p](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+            [&pid, &i, &dp, &state, &best_err, &it, &par, &optimize, &p](uWS::WebSocket<uWS::SERVER> ws, char *data,
+                                                                         size_t length, uWS::OpCode opCode) {
                 // "42" at the start of the message means there's a websocket message event.
                 // The 4 signifies a websocket message
                 // The 2 signifies a websocket event
                 if (length && length > 2 && data[0] == '4' && data[1] == '2') {
-                    if (i >= 100 && optimize) {
+                    double tolerance = 0.2;
+                    int n = 500;
+
+                    //twiddle
+                    if (i >= n && optimize) {
                         i = 0;
-                        it++;
 
                         double err = pid.TotalError();
                         double sum_dp = std::accumulate(std::begin(dp), std::end(dp), 0.0, std::plus<double>());
 
-                        std::cout << "iteration: " << it << ", error: " << err << ", sum_dp: " << sum_dp << std::endl;
-                        std::cout << "Kp = " << p[0] << ", Ki = " << p[1] << ", Kd = " << p[2] << std::endl;
+                        if (state < 2 & par == 0) {
+                            std::cout << "iteration: " << it++ << ", error: " << err << ", best_err: " << best_err
+                                      << ", sum_dp: " << sum_dp << std::endl;
+                            std::cout << "Kp = " << p[0] << ", Ki = " << p[1] << ", Kd = " << p[2] << std::endl;
+                            //std::cout << "dp0 = " << dp[0] << ", dp1 = " << dp[1] << ", dp2 = " << dp[2] << std::endl;
+                        }
 
-                        //twiddle
-                        if (sum_dp > 0.2) {
+                        if (sum_dp > tolerance) {
                             //std::cout << "state = " << state << ", par = " << par << std::endl;
                             switch (state) {
                                 case 0: // init
                                     best_err = err;
                                     state = 1;
                                     p[par] += dp[par];
-                                    pid.Init(p[0], p[1], p[2]);
                                     break;
                                 case 1:
                                     if (err < best_err) {
                                         best_err = err;
                                         dp[par] *= 1.1;
 
-                                        par = (par+1)%3;
+                                        par = (par + 1) % 3;
+                                        if(par==1) par++; // Ki is constant
+
                                         p[par] += dp[par];
-                                        pid.Init(p[0], p[1], p[2]);
                                     } else {
-                                        p[par] -= 2 * dp[par];
-                                        pid.Init(p[0], p[1], p[2]);
+                                        p[par] -= 2. * dp[par];
                                         state = 2;
                                     }
                                     break;
@@ -121,15 +126,16 @@ void run(double p[], bool optimize) {
                                         p[par] += dp[par];
                                         dp[par] *= 0.9;
                                     }
-                                    par = (par+1)%3;
+                                    par = (par + 1) % 3;
+                                    if(par==1) par++; // Ki is constant
+
                                     state = 1;
                                     p[par] += dp[par];
-                                    pid.Init(p[0], p[1], p[2]);
                                     break;
                             }
-                        }
-                        else
-                        {
+
+                            pid.Init(p[0], p[1], p[2]);
+                        } else {   // finish!!!
                             optimize = false;
                         }
                     }
@@ -139,7 +145,7 @@ void run(double p[], bool optimize) {
                         ws.send(reset_msg.data(), reset_msg.length(), uWS::OpCode::TEXT);
                     }
 
-                    move(ws, data, length, opCode, !optimize, pid);
+                    move(ws, data, length, opCode, false, pid);
                 }
             });
 
@@ -176,9 +182,11 @@ void run(double p[], bool optimize) {
 
 
 int main() {
-    double p[] = {0, 0, 0};
-    //double p[] = {0.2, 0.004, 3.0};
-    run(p, true);
+    //double p[] = {0, 0, 0};
+    double p[] = {0.750722, 0.000, 4.18653};
+    //double p[] = {0.2, 0.000, 3};
+    
+    run(p, true); // (parameters, use twiddle)
 
     return 0;
 }

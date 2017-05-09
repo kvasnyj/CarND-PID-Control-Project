@@ -1,5 +1,6 @@
 #include <iostream>
 #include "PID.h"
+#include <cmath>
 
 using namespace std;
 
@@ -27,7 +28,7 @@ double PID::UpdateError(double cte) {
     double diff_cte = cte - prev_cte;
     prev_cte = cte;
     int_cte += cte;
-    err += cte * cte;
+    err += fabs(cte);
     double steer = -Kp * cte - Kd * diff_cte - Ki * int_cte;
 
     //std::cout << "CTE: " << cte << " diff_cte: " << diff_cte << " int_cte: " << int_cte << std::endl;
